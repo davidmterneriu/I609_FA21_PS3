@@ -68,4 +68,151 @@ plot1=q1_df%>%gather(key="Series",value="share",-1)%>%
   labs(y="Population Share",title = "SIR Model Simulation",
        subtitle = TeX("($\\beta =3$ and $\\gamma =1.6$)"))
 
+################################################################################
+#Q2
+################################################################################
+
+q1_df%>%filter(Time==5.2)%>%
+  select(Infected)%>%
+  unlist()%>%
+  as.numeric()
+
+################################################################################
+#Q3
+################################################################################
+
+q1_df%>%filter(Time==max(Time))%>%
+  select(Removed)%>%
+  unlist()%>%
+  as.numeric()
+
+################################################################################
+#Q4
+################################################################################
+
+infect_df=q1_df%>%select(Time,Infected)
+infect_fun1=approxfun(x=infect_df$Time,y=infect_df$Infected)
+
+infect_over1=function(test_time){
+  over_level=0.03
+  res=infect_fun1(test_time)-over_level
+  return(res)
+}
+
+time_over=uniroot(f=infect_over1,lower = 0,upper = 20,
+                  tol=10^(-9))
+#Time that the plague is over
+time_over$root
+
+#Sniff check
+infect_fun1(time_over$root)
+
+################################################################################
+#Q5
+################################################################################
+
+max_infect1=optimize(f=infect_fun1,lower=0,upper = 20,maximum = T)
+
+#infection max time
+max_infect1$maximum
+
+#infection max
+max_infect1$objective
+
+time_seq=seq(0,time_over$root,length=1000)
+
+q5_data=data.frame(Time=time_seq,Infected=infect_fun1(time_seq))
+
+ggplot(data=q5_data,aes(x=Time,y=Infected))+
+  geom_line(color="red",size=1)+
+  scale_y_continuous(breaks=seq(0.03,max_infect1$maximum,by=0.025))+
+  geom_hline(yintercept = 0.03,linetype="dotted")+
+  geom_segment(x=max_infect1$maximum,y=0,xend=max_infect1$maximum,yend=max_infect1$objective,
+               linetype="dashed")+
+  theme_bw()+
+  labs(title = "Infection Curve",
+       subtitle = "From the epidemic's beginning to end.")
+
+
+################################################################################
+#Q6
+################################################################################
+
+suspect_df=q1_df%>%select(Time,Susceptible)
+suspect_fun1=approxfun(x=suspect_df$Time,y=suspect_df$Susceptible)  
+
+#Susceptible share when infections peak 
+suspect_fun1(max_infect1$maximum)
+
+
+################################################################################
+#Q8
+################################################################################
+
+
+par_set2=c(beta=1.5,gamma=1.6)
+
+
+q8_df=SIR_fun(s0=0.87,i0=0.13,r0=0,
+              beta=par_set2[1],gamma=par_set2[2],
+              dt=0.001,Tend = 20)
+
+plot2=q8_df%>%gather(key="Series",value="share",-1)%>%
+  mutate(Series=factor(Series,levels = c("Susceptible","Infected","Removed")))%>%
+  ggplot(aes(x=Time,y=share,color=Series))+
+  geom_line(size=1)+
+  ggthemes::scale_color_fivethirtyeight()+
+  theme_bw()+
+  scale_y_continuous(breaks = seq(0,1,by=0.1))+
+  labs(y="Population Share",title = "SIR Model Simulation",
+       subtitle = TeX("($\\beta =1.5$ and $\\gamma =1.6$)"))
+
+################################################################################
+#Q9
+################################################################################
+
+
+q8_df%>%filter(Time==max(Time))%>%
+  select(Removed)%>%
+  unlist()%>%
+  as.numeric()
+
+################################################################################
+#Bonus
+################################################################################
+
+s_max_test=function(beta,gamma,test_val){
+  ratio=beta/gamma
+  LHS=log(test_val)
+  RHS=ratio*(test_val-1)
+  res=abs(LHS-RHS)
+  return(res)
+}
+
+
+
+s0_1=optim(f=s_max_test,par=0.5,beta=3,gamma=1.6,lower = 0,upper=1,method = "Brent")$par
+
+1/1.6
+
+1/(2*1.6)
+
+
+#Option 1
+
+q_opt1_df=SIR_fun(s0=0.87,i0=0.13,r0=0,
+              beta=3/2,gamma=1.6,
+              dt=0.001,Tend = 20)
+
+#Option 2
+
+q_opt2_df=SIR_fun(s0=0.87,i0=0.13,r0=0,
+                  beta=3,gamma=2*1.6,
+                  dt=0.001,Tend = 20)
+
+rbind(select(q_opt1_df,Time,Infected)%>%mutate(Policy="1/2 x Beta"),
+      select(q_opt1_df,Time,Infected)%>%mutate(Policy="2 x Gamma"))%>%
+  ggplot(aes(x=Time,y=Infected,color=Policy))+
+  geom_line()
+
 
