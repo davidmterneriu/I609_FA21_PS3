@@ -192,6 +192,9 @@ s_max_test=function(beta,gamma,test_val){
 
 
 s0_1=optim(f=s_max_test,par=0.5,beta=3,gamma=1.6,lower = 0,upper=1,method = "Brent")$par
+s0_1
+
+
 
 1/1.6
 
@@ -201,18 +204,76 @@ s0_1=optim(f=s_max_test,par=0.5,beta=3,gamma=1.6,lower = 0,upper=1,method = "Bre
 #Option 1
 
 q_opt1_df=SIR_fun(s0=0.87,i0=0.13,r0=0,
-              beta=3/2,gamma=1.6,
+              beta=1.5,gamma=1.6,
               dt=0.001,Tend = 20)
 
 #Option 2
 
 q_opt2_df=SIR_fun(s0=0.87,i0=0.13,r0=0,
-                  beta=3,gamma=2*1.6,
+                  beta=3,gamma=3.2,
                   dt=0.001,Tend = 20)
 
-rbind(select(q_opt1_df,Time,Infected)%>%mutate(Policy="1/2 x Beta"),
-      select(q_opt1_df,Time,Infected)%>%mutate(Policy="2 x Gamma"))%>%
+rbind(select(q_opt1_df,Time,Infected)%>%mutate(Policy="Lockdown: 1/2 x Beta"),
+      select(q_opt2_df,Time,Infected)%>%mutate(Policy="Medicine: 2 x Gamma"))%>%
   ggplot(aes(x=Time,y=Infected,color=Policy))+
-  geom_line()
+  geom_line(size=1)+
+  theme_bw()+
+  ggthemes::scale_color_few()+
+  labs(title="Infection population over time: Lockdowns vs Medicine")+
+  theme(legend.position = "top")
+
+q_opt1_df%>%filter(Time==max(Time))
+
+q_opt2_df%>%filter(Time==max(Time))
 
 
+
+
+
+trap_int=function(a,b,n,fun1){
+  xgrid=seq(a,b,length=n)
+  step=(b-a)/n
+  res=c(rep(0,n-1))
+  for(k in 1:(n-1)){
+    res[k]<-fun1(a+k*step)
+  }
+  res=sum(res)
+  res=step*(fun1(a)/2+res+fun1(b)/2)
+  return(res)
+}
+
+infect_opt1=approxfun(x=q_opt1_df$Time,y=q_opt1_df$Infected)
+infect_opt2=approxfun(x=q_opt2_df$Time,y=q_opt2_df$Infected)
+
+area_curve=data.frame(Policy=c("Lockdown: 1/2 x Beta","Medicine: 2 x Gamma"),
+                      Lost=c(trap_int(a=0,b=20,n=1000,fun1=infect_opt1),
+                             trap_int(a=0,b=20,n=1000,fun1=infect_opt2)))
+
+ggplot(data=area_curve,
+       aes(x=Policy,y=Lost,fill=Policy))+
+  geom_bar(stat="identity")+
+  geom_text(aes(label=round(Lost,2)),vjust=-0.25)+
+  theme_bw()+
+  ggthemes::scale_fill_few()+
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        legend.position = "top")+
+  labs(y="Total working hours",title="Lost working hours: Lockdowns vs Medicine")
+
+
+
+
+infect_over1=function(x){
+  return(infect_opt1(x)-0.03)
+}
+
+
+infect_over2=function(x){
+  return(infect_opt2(x)-0.03)
+}
+
+uniroot(infect_over1,lower=0,upper=20)$root
+uniroot(infect_over2,lower=0,upper=20)$root
+
+uniroot(infect_over1,lower=0,upper=20)$root/uniroot(infect_over2,lower=0,upper=20)$root
